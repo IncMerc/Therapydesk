@@ -1,0 +1,13 @@
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.4
+psycopg[binary]==3.3.6
+pydantic-settings==2.15.0
+email-validator==2.3.0
+pyjwt==2.7.0
+argon2-cffi==25.1.0
+httpx==0.28.1
+# phase 3 worker (transcription); the API process never imports these
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+av==18.1.0

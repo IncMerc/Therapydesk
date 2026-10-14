@@ -1,0 +1,80 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: therapy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d therapy"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://app_user:${APP_DB_PASSWORD}@db:5432/therapy
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      CORS_ORIGINS: '["http://localhost:5173"]'
+      PUBLIC_APP_URL: http://localhost:5173
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_API_KEY: therapydesk
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?set in .env}
+      RECORDINGS_DIR: /data/recordings
+    volumes:
+      - recordings:/data/recordings
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  # same image as api
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://app_user:${APP_DB_PASSWORD}@db:5432/therapy
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?set in .env}
+      RECORDINGS_DIR: /data/recordings
+      MODELS_DIR: /data/models
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-local}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    volumes:
+      - recordings:/data/recordings
+      - models:/data/models
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # ollama on the host
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  livekit:
+    image: livekit/livekit-server:v1.13.9
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "therapydesk: ${LIVEKIT_API_SECRET:?set in .env}"
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "127.0.0.1:7881:7881"
+      - "127.0.0.1:7882:7882/udp"
+
+volumes:
+  pgdata:
+  recordings:
+  models:
