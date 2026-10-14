@@ -92,11 +92,3 @@ docker compose exec -T db psql -U postgres -d therapy -f /docker-entrypoint-init
 ```
 
 Both are safe to re-run.
-
-## Known gaps
-
-- The local LiveKit only works on one machine. Calls across devices need LiveKit Cloud or a proper deploy with TURN.
-- JWT lives in localStorage; should move to an httpOnly cookie.
-- No encryption at rest for transcripts/notes yet, and no access audit log.
-- Migrations are plain SQL files; Alembic once the schema settles.
-- Next-session suggestions from past sessions (pgvector + BM25) aren't built yet; `plan_items` is a placeholder.
